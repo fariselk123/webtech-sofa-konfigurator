@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: webtech-php
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html/public
+    depends_on:
+      - db
+    networks:
+      - webtech-network
+
+  db:
+    image: mariadb:latest
+    container_name: webtech-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pw
+      MYSQL_DATABASE: webtech
+      MYSQL_USER: webtech
+      MYSQL_PASSWORD: webtech_pw
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - webtech-network
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: webtech-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_USER: webtech
+      PMA_PASSWORD: webtech_pw
+      PMA_ROOT_PASSWORD: root_pw
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    networks:
+      - webtech-network
+
+volumes:
+  db-data:
+
+networks:
+  webtech-network:
+    driver: bridge
