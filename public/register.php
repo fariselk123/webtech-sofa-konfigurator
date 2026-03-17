@@ -1,10 +1,16 @@
 <?php
 /**
  * Registrierungsseite für den Sofa-Konfigurator
- * 
+ *
  * Ermöglicht neuen Benutzern die Registrierung mit Benutzername, Email und Passwort.
  * Verwendet PDO für sichere Datenbankoperationen.
+ * Öffentliche Seite - keine Login-Prüfung erforderlich.
  */
+
+// Starte Session ganz am Anfang für Konsistenz
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Initialisiere Variablen für Fehlermeldungen und Erfolg
 $error = '';
