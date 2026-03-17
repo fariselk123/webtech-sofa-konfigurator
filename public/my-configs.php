@@ -51,6 +51,45 @@ function getMaterialLabel($material) {
     ];
     return $labels[$material] ?? $material;
 }
+
+function calculatePrice($size, $material) {
+    $sizePrices = [
+        '2-sitzer' => 0,
+        '3-sitzer' => 200,
+        'ecksofa' => 400,
+        'u-sofa' => 600,
+        'sessel' => 50,
+        'loveseat' => 75,
+        'relaxsessel' => 120,
+        'relaxsessel-hocker' => 150,
+        'hocker' => 20,
+        'hocker-gross' => 35,
+        'schlafsofa' => 300,
+        'recamiere' => 250,
+        'modulsofa' => 400,
+        'lounge-sofa' => 350,
+        'daybed' => 200,
+        'sofa-beistelltisch' => 130,
+        'sofa-ottomane' => 140,
+        'futon-sofa' => 210,
+        'klappsofa' => 150,
+        'bank-sofa' => 100
+    ];
+
+    $materialPrices = [
+        'stoff' => 0,
+        'leder' => 300,
+        'kunstleder' => 150,
+        'samt' => 200,
+        'mikrofaser' => 100
+    ];
+
+    $basePrice = 500;
+    $sizePrice = $sizePrices[$size] ?? 0;
+    $materialPrice = $materialPrices[$material] ?? 0;
+
+    return $basePrice + $sizePrice + $materialPrice;
+}
 ?>
 
 <!DOCTYPE html>
@@ -107,15 +146,26 @@ function getMaterialLabel($material) {
                                 <th>Größe</th>
                                 <th>Farbe</th>
                                 <th>Material</th>
+                                <th class="text-end">Preis</th>
                                 <th>Erstellungsdatum</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($configs as $config): ?>
+                                <?php
+                                    $price = null;
+                                    if (isset($config['price']) && is_numeric($config['price'])) {
+                                        $price = floatval($config['price']);
+                                    } else {
+                                        $price = calculatePrice($config['sofa_size'], $config['sofa_material']);
+                                    }
+                                    $priceFormatted = number_format($price, 2, ',', '.') . ' €';
+                                ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars(getSizeLabel($config['sofa_size'])); ?></td>
                                     <td><?php echo htmlspecialchars($config['sofa_color']); ?></td>
                                     <td><?php echo htmlspecialchars(getMaterialLabel($config['sofa_material'])); ?></td>
+                                    <td class="text-end fw-bold"><?php echo $priceFormatted; ?></td>
                                     <td><?php echo htmlspecialchars(date('d.m.Y H:i', strtotime($config['created_at']))); ?></td>
                                 </tr>
                             <?php endforeach; ?>

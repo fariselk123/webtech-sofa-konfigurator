@@ -1,13 +1,20 @@
 <?php
 /**
  * Speicher-Seite für Sofa-Konfigurationen
- * 
+ *
  * Empfängt Konfigurationsdaten, berechnet Preis, speichert in DB und zeigt Zusammenfassung.
+ * Geschützte Seite - erfordert Login.
  */
 
-// Starte Session
+// Starte Session ganz am Anfang
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
+
+// Prüfe, ob Benutzer eingeloggt ist - wenn nicht, zu login.php weiterleiten
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
 }
 
 // Initialisiere Variablen
@@ -19,11 +26,6 @@ $configuration = [
     'material' => '',
     'price' => 0
 ];
-
-// Prüfe, ob Benutzer eingeloggt ist
-if (!isset($_SESSION['user_id'])) {
-    $errors[] = 'Sie müssen eingeloggt sein, um Konfigurationen zu speichern.';
-}
 
 // Prüfe, ob POST-Daten vorhanden sind
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -134,8 +136,11 @@ function getMaterialLabel($material) {
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
             padding: 3rem;
-            max-width: 600px;
+            max-width: 800px;
             width: 100%;
+        }
+        .configuration-summary {
+            padding: 2.5rem;
         }
     </style>
 </head>
@@ -159,41 +164,41 @@ function getMaterialLabel($material) {
                     
                     <!-- Erfolg und Zusammenfassung -->
                     <?php if ($success): ?>
-                        <div class="alert alert-success">
+                        <div class="alert alert-success mb-4">
                             Ihre Konfiguration wurde erfolgreich gespeichert!
                         </div>
                         
-                        <div class="configuration-summary bg-light p-4 rounded">
+                        <div class="configuration-summary bg-light rounded">
                             <h4 class="mb-3">Zusammenfassung</h4>
                             
                             <div class="row">
                                 <div class="col-md-6">
-                                    <p><strong>Sofa Größe:</strong> <?php echo htmlspecialchars(getSizeLabel($configuration['size'])); ?></p>
+                                    <p><strong class="fs-5">Sofa Größe:</strong> <?php echo htmlspecialchars(getSizeLabel($configuration['size'])); ?></p>
                                 </div>
                                 <div class="col-md-6">
-                                    <p><strong>Sofa Farbe:</strong> <?php echo htmlspecialchars($configuration['color']); ?></p>
+                                    <p><strong class="fs-5">Sofa Farbe:</strong> <?php echo htmlspecialchars($configuration['color']); ?></p>
                                 </div>
                             </div>
                             
                             <div class="row">
                                 <div class="col-md-6">
-                                    <p><strong>Sofa Material:</strong> <?php echo htmlspecialchars(getMaterialLabel($configuration['material'])); ?></p>
+                                    <p><strong class="fs-5">Sofa Material:</strong> <?php echo htmlspecialchars(getMaterialLabel($configuration['material'])); ?></p>
                                 </div>
                                 <div class="col-md-6">
-                                    <p><strong>Gesamtpreis:</strong> <?php echo number_format($configuration['price'], 2, ',', '.'); ?> €</p>
+                                    <p><strong class="fs-5">Gesamtpreis:</strong> <?php echo number_format($configuration['price'], 2, ',', '.'); ?> €</p>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="text-center mt-4">
-                            <a href="my-configs.php" class="btn btn-primary btn-lg me-3">Meine Konfigurationen anzeigen</a>
-                            <a href="configurator.php" class="btn btn-success btn-lg me-3">Neue Konfiguration erstellen</a>
+                        <div class="d-flex flex-wrap justify-content-center gap-3 mt-4">
+                            <a href="my-configs.php" class="btn btn-primary btn-lg">Meine Konfigurationen anzeigen</a>
+                            <a href="configurator.php" class="btn btn-success btn-lg">Neue Konfiguration erstellen</a>
                             <a href="index.php" class="btn btn-secondary btn-lg">Zur Startseite</a>
                         </div>
                     <?php endif; ?>
                     
                     <!-- Link zurück zur Konfiguration -->
-                    <div class="text-center mt-4">
+                    <div class="text-center mt-5">
                         <a href="configurator.php" class="text-decoration-none">← Zurück zum Konfigurator</a>
                     </div>
                 </div>

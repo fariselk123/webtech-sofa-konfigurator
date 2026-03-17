@@ -1,14 +1,21 @@
 <?php
 /**
  * Login-Seite für den Sofa-Konfigurator
- * 
+ *
  * Ermöglicht bestehenden Benutzern die Anmeldung mit E-Mail und Passwort.
  * Verwendet Sessions für die Authentifizierung.
+ * Wenn bereits eingeloggt, Weiterleitung zu index.php.
  */
 
-// Starte Session, falls noch nicht geschehen
+// Starte Session ganz am Anfang
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
+
+// Prüfe, ob Benutzer bereits eingeloggt ist
+if (isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit;
 }
 
 // Initialisiere Variable für Fehlermeldung
@@ -18,11 +25,11 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Lade Datenbankverbindung
     require_once '../app/config/db.php';
-    
+
     // Sammle Eingaben
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    
+
     // Grundlegende Validierung
     if (empty($email) || empty($password)) {
         $error = 'Bitte füllen Sie alle Felder aus.';
@@ -34,12 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("SELECT id, username, password FROM users WHERE email = ?");
             $stmt->execute([$email]);
             $user = $stmt->fetch();
-            
+
             if ($user && password_verify($password, $user['password'])) {
                 // Login erfolgreich: Session starten und User-ID sowie Username speichern
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
-                
+
                 // Weiterleitung zur Startseite
                 header('Location: index.php');
                 exit;
