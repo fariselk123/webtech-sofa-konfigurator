@@ -1,43 +1,47 @@
 <?php
 /**
- * Sofa-Konfigurator Startseite
+ * Sofa-Konfigurator
  * 
- * Ermöglicht Benutzern die Konfiguration eines Sofas in einem Schritt:
- * Größe, Farbe und Material wählen mit dynamischer Vorschau.
- * 
- * Verwendet Sessions zur temporären Speicherung der Auswahl.
+ * Ermöglicht Benutzern die Konfiguration eines Sofas:
+ * - Größe, Farbe und Material mit dynamischer 3D-Vorschau
+ * - Raum-Berater für automatische Größenempfehlung
+ * - Live-Preisberechnung und Zusammenfassung
+ * - Session-basierte Speicherung
  */
 
-// Session starten und prüfen, ob ein Benutzer eingeloggt ist
+// === PHP Backend Setup ===
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// Authentifizierung prüfen
 if (!isset($_SESSION['user_id'])) {
-    // Nicht eingeloggt, zurück zur Login-Seite
     header('Location: login.php');
     exit;
 }
 
-// Initialisiere Konfigurationsdaten
+// Initialisiere Konfiguration
 $config = [
-    'size' => $_SESSION['config_size'] ?? '',
+    'size' => $_SESSION['config_size'] ?? 'loveseat',
     'color' => $_SESSION['config_color'] ?? '',
     'material' => $_SESSION['config_material'] ?? ''
 ];
 
-// Verarbeite Formularabsendung
+// Default auf Loveseat setzen falls leer
+if (empty($_SESSION['config_size'])) {
+    $_SESSION['config_size'] = 'loveseat';
+}
+
+// POST: Konfiguration speichern
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Speichere Auswahl in Session
     $_SESSION['config_size'] = $_POST['sofa_size'] ?? '';
     $_SESSION['config_color'] = $_POST['sofa_color'] ?? '';
     $_SESSION['config_material'] = $_POST['sofa_material'] ?? '';
-    
-    // Weiterleitung zur Zusammenfassung
     header('Location: save.php');
     exit;
 }
 
-// Definiere verfügbare Optionen
+// === Datenstrukturen ===
 $sizes = [
     '2-sitzer' => '2-Sitzer Sofa',
     '3-sitzer' => '3-Sitzer Sofa',
@@ -69,39 +73,18 @@ $materials = [
     'mikrofaser' => 'Mikrofaser'
 ];
 
-// Preise
 $sizePrices = [
-    '2-sitzer' => 0,
-    '3-sitzer' => 200,
-    'ecksofa' => 400,
-    'u-sofa' => 600,
-    'sessel' => 50,
-    'loveseat' => 75,
-    'relaxsessel' => 120,
-    'relaxsessel-hocker' => 150,
-    'hocker' => 20,
-    'hocker-gross' => 35,
-    'schlafsofa' => 220,
-    'recamiere' => 180,
-    'modulsofa' => 250,
-    'lounge-sofa' => 160,
-    'daybed' => 190,
-    'sofa-beistelltisch' => 130,
-    'sofa-ottomane' => 140,
-    'futon-sofa' => 210,
-    'klappsofa' => 170,
-    'bank-sofa' => 110
+    '2-sitzer' => 0, '3-sitzer' => 200, 'ecksofa' => 400, 'u-sofa' => 600,
+    'sessel' => 50, 'loveseat' => 75, 'relaxsessel' => 120, 'relaxsessel-hocker' => 150,
+    'hocker' => 20, 'hocker-gross' => 35, 'schlafsofa' => 220, 'recamiere' => 180,
+    'modulsofa' => 250, 'lounge-sofa' => 160, 'daybed' => 190, 'sofa-beistelltisch' => 130,
+    'sofa-ottomane' => 140, 'futon-sofa' => 210, 'klappsofa' => 170, 'bank-sofa' => 110
 ];
 
 $materialPrices = [
-    'stoff' => 0,
-    'leder' => 300,
-    'kunstleder' => 150,
-    'samt' => 200,
-    'mikrofaser' => 100
+    'stoff' => 0, 'leder' => 300, 'kunstleder' => 150, 'samt' => 200, 'mikrofaser' => 100
 ];
 
-// Farbpalette
 $colors = [
     ['name' => 'Weiß', 'hex' => '#FFFFFF'],
     ['name' => 'Schwarz', 'hex' => '#000000'],
@@ -134,42 +117,58 @@ $colors = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sofa Konfigurator</title>
-
-    <!-- Bootstrap 5 CSS via CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
     <style>
+        /* ===== Layout Grundlagen ===== */
         body {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+
         .configurator-container {
             max-width: 1400px;
             margin: 2rem auto;
             padding: 1rem 2rem;
         }
-        .selection-panel {
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 0.5rem;
+        }
+
+        /* ===== Panel Styling ===== */
+        .selection-panel,
+        .preview-panel,
+        .info-box,
+        .summary-card {
             background: white;
             border-radius: 15px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            padding: 2rem;
-            height: fit-content;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .preview-panel {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+        .selection-panel {
             padding: 2rem;
+            height: fit-content;
+        }
+
+        .preview-panel {
+            padding: 2rem;
+            min-height: 600px;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 600px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
             overflow: hidden;
         }
+
         .preview-panel::before {
             content: '';
             position: absolute;
@@ -180,75 +179,49 @@ $colors = [
             background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
             pointer-events: none;
         }
-        .sofa-preview {
-            width: 100%;
-            max-width: 700px;
-            height: auto;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.2));
+
+        .info-box {
+            padding: 1.25rem;
+            margin-top: 1.25rem;
         }
-        .size-option, .material-option {
+
+        .info-box h4 {
+            font-size: 1.05rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            padding-bottom: 0.5rem;
+        }
+
+        .summary-card {
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+
+        /* ===== Auswahloptionen ===== */
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .size-option,
+        .material-option {
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: 2px solid #e9ecef;
             border-radius: 10px;
             margin-bottom: 0.5rem;
         }
-        .size-option:hover, .material-option:hover,
-        .size-option.active, .material-option.active {
+
+        .size-option:hover,
+        .material-option:hover,
+        .size-option.active,
+        .material-option.active {
             border-color: #007bff;
             box-shadow: 0 4px 20px rgba(0, 123, 255, 0.2);
             transform: translateY(-2px);
         }
-        .color-option {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 4px solid #fff;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            margin: 0.25rem;
-        }
-        .color-option:hover, .color-option.active {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-            border-color: #007bff;
-        }
-        .progress {
-            height: 10px;
-            border-radius: 5px;
-            margin-bottom: 2rem;
-        }
-        .summary-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            padding: 2rem;
-            margin-top: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .price-display {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #28a745;
-            text-align: center;
-            margin: 1rem 0;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 1rem;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 0.5rem;
-        }
-        .option-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 0.75rem;
-        }
+
         .material-preview {
             width: 100%;
             height: 80px;
@@ -260,51 +233,34 @@ $colors = [
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-size: 0.85rem;
-        }
-        /* Material-Effekte */
-        .mat-stoff { filter: brightness(0.95) contrast(0.9) saturate(0.8); }
-        .mat-leder { filter: brightness(1.1) contrast(1.2) saturate(1.4) hue-rotate(-5deg); }
-        .mat-kunstleder { filter: brightness(1.05) contrast(1.1) saturate(1.1); }
-        .mat-samt { filter: brightness(0.98) saturate(1.3) hue-rotate(2deg) contrast(1.05); }
-        .mat-mikrofaser { filter: brightness(1.02) contrast(0.98) saturate(0.9); }
-
-        /* Animation für Vorschau-Änderungen */
-        .sofa-svg {
-            animation: fadeIn 0.5s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         }
 
-        /* Info-Boxen (Preiskatalog / Raum-Berater) */
-        .info-box {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 12px 25px rgba(0,0,0,0.08);
-            padding: 1.25rem;
-            margin-top: 1.25rem;
+        .color-option {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 4px solid #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin: 0.25rem;
         }
-        .info-box h4 {
-            font-size: 1.05rem;
-            margin-bottom: 0.75rem;
-            border-bottom: 1px solid rgba(0,0,0,0.08);
-            padding-bottom: 0.5rem;
+
+        .color-option:hover,
+        .color-option.active {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+            border-color: #007bff;
         }
-        .info-box ul {
-            list-style: none;
-            padding-left: 0;
-            margin: 0;
-        }
-        .info-box li {
-            margin: 0.3rem 0;
-            font-size: 0.95rem;
-        }
-        .info-box .price-list {
+
+        /* ===== Preisliste ===== */
+        .price-list {
             max-height: 300px;
             overflow-y: auto;
             padding-right: 0.5rem;
         }
+
         .price-item {
             display: flex;
             justify-content: space-between;
@@ -314,50 +270,153 @@ $colors = [
             transition: background 0.2s ease;
             cursor: pointer;
         }
+
         .price-item:hover {
             background: rgba(0, 0, 0, 0.03);
         }
+
         .price-item.active {
             font-weight: 700;
             font-size: 1.05rem;
             background: rgba(0, 123, 255, 0.08);
         }
 
-        /* Responsive Design */
+        /* ===== 3D Viewer & Raum-Berater Layout ===== */
+        .preview-room-container {
+            display: flex;
+            gap: 1rem;
+            align-items: stretch;
+            margin-bottom: 1rem;
+        }
+
+        .preview-room-container .preview-panel {
+            flex: 0 0 80%;
+            min-height: 600px;
+        }
+
+        .preview-room-container .info-box#room-advisor {
+            flex: 0 0 20%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            margin-top: 0;
+        }
+
+        .preview-room-container .info-box#room-advisor .form-select {
+            width: 100%;
+            max-width: none;
+        }
+
+        /* ===== Dimension Overlay ===== */
+        .dimensions-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #fff;
+            z-index: 10;
+            line-height: 1.6;
+            backdrop-filter: blur(4px);
+        }
+
+        .dimension-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .dimension-item span {
+            font-family: 'Courier New', monospace;
+        }
+
+        /* ===== Fortschritt & Preis ===== */
+        .progress {
+            height: 10px;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+        }
+
+        .price-display {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #28a745;
+            text-align: center;
+            margin: 1rem 0;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ===== Responsive Design ===== */
+        @media (max-width: 1200px) {
+            .preview-room-container {
+                flex-direction: column;
+            }
+
+            .preview-room-container .preview-panel {
+                flex: 0 0 auto;
+                min-height: 500px;
+            }
+
+            .preview-room-container .info-box#room-advisor {
+                flex: 0 0 auto;
+            }
+        }
+
         @media (max-width: 768px) {
-            .configurator-container { padding: 1rem; }
-            .preview-panel { min-height: 400px; }
-            .sofa-preview { max-width: 100%; }
+            .configurator-container {
+                padding: 1rem;
+            }
+
+            .preview-panel {
+                min-height: 350px;
+            }
+
+            .preview-room-container {
+                flex-direction: column;
+            }
+
+            .preview-room-container .preview-panel {
+                flex: 0 0 auto;
+            }
+
+            .preview-room-container .info-box#room-advisor {
+                flex: 0 0 auto;
+            }
+
+            .section-title {
+                font-size: 1rem;
+            }
         }
     </style>
-
-    <!-- Google Model Viewer -->
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
 <body>
     <div class="container configurator-container">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <a href="index.php" class="btn btn-outline-secondary me-2">← Zurück zur Startseite</a>
+                <a href="index.php" class="btn btn-outline-secondary me-2">← Zurück</a>
                 <a href="my-configs.php" class="btn btn-primary">📋 Meine Konfigurationen</a>
             </div>
         </div>
+
         <h1 class="text-center mb-4" style="color: #333; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">🛋️ Sofa Konfigurator</h1>
 
-        <!-- Fortschrittsanzeige -->
         <div class="progress mb-4">
             <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
-        <p class="text-center text-muted mb-4" id="progress-text" style="font-weight: 500;">0 von 3 Schritten abgeschlossen</p>
+        <p class="text-center text-muted mb-4" id="progress-text">0 von 3 Schritten abgeschlossen</p>
 
         <form id="configurator-form" onsubmit="saveConfiguration(event)">
             <div class="row g-4">
-                <!-- Linke Spalte: Auswahloptionen -->
+                <!-- Linke Spalte: Auswahl -->
                 <div class="col-lg-5">
                     <div class="selection-panel">
                         <h3 class="section-title">Konfiguration</h3>
 
-                        <!-- Größe wählen -->
+                        <!-- Größe -->
                         <div class="mb-4">
                             <h5 class="section-title" style="font-size: 1rem; margin-bottom: 1rem;">Größe</h5>
                             <div class="option-grid">
@@ -366,43 +425,44 @@ $colors = [
                                          onclick="selectSize(event, '<?php echo $key; ?>')">
                                         <div class="card-body p-2">
                                             <h6 class="card-title mb-1" style="font-size: 0.9rem;"><?php echo $label; ?></h6>
-                                            <input type="radio" name="sofa_size" value="<?php echo $key; ?>" class="d-none" <?php echo ($config['size'] === $key) ? 'checked' : ''; ?>>
+                                            <input type="radio" name="sofa_size" value="<?php echo $key; ?>" class="d-none" 
+                                                   <?php echo ($config['size'] === $key) ? 'checked' : ''; ?>>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
                         </div>
 
-                        <!-- Farbe wählen -->
+                        <!-- Farbe -->
                         <div class="mb-4">
                             <h5 class="section-title" style="font-size: 1rem; margin-bottom: 1rem;">Farbe</h5>
                             <div class="d-flex flex-wrap justify-content-center">
-                                <?php foreach ($colors as $index => $color): ?>
+                                <?php foreach ($colors as $color): ?>
                                     <div class="color-option"
                                          style="background-color: <?php echo $color['hex']; ?>;"
-                                         onclick="selectColor(<?php echo $index; ?>)"
+                                         onclick="selectColor(event)"
                                          title="<?php echo $color['name']; ?>"
                                          data-color="<?php echo $color['name']; ?>"
                                          data-hex="<?php echo $color['hex']; ?>"
                                          class="<?php echo ($config['color'] === $color['name']) ? 'active' : ''; ?>">
                                     </div>
-                                    <input type="radio" name="sofa_color" value="<?php echo $color['name']; ?>" class="d-none" <?php echo ($config['color'] === $color['name']) ? 'checked' : ''; ?>>
+                                    <input type="radio" name="sofa_color" value="<?php echo $color['name']; ?>" class="d-none" 
+                                           <?php echo ($config['color'] === $color['name']) ? 'checked' : ''; ?>>
                                 <?php endforeach; ?>
                             </div>
                         </div>
 
-                        <!-- Material wählen -->
+                        <!-- Material -->
                         <div class="mb-4">
                             <h5 class="section-title" style="font-size: 1rem; margin-bottom: 1rem;">Material</h5>
                             <div class="option-grid">
                                 <?php foreach ($materials as $key => $label): ?>
                                     <div class="material-option card text-center p-2 <?php echo ($config['material'] === $key) ? 'active' : ''; ?>"
-                                         onclick="selectMaterial('<?php echo $key; ?>')">
+                                         onclick="selectMaterial(event, '<?php echo $key; ?>')">
                                         <div class="card-body p-2">
-                                            <div class="material-preview" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
-                                                <?php echo $label; ?>
-                                            </div>
-                                            <input type="radio" name="sofa_material" value="<?php echo $key; ?>" class="d-none" <?php echo ($config['material'] === $key) ? 'checked' : ''; ?>>
+                                            <div class="material-preview"><?php echo $label; ?></div>
+                                            <input type="radio" name="sofa_material" value="<?php echo $key; ?>" class="d-none" 
+                                                   <?php echo ($config['material'] === $key) ? 'checked' : ''; ?>>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -411,13 +471,34 @@ $colors = [
                     </div>
                 </div>
 
-                <!-- Rechte Spalte: Große Produktvorschau -->
+                <!-- Rechte Spalte: 3D Vorschau + Raum-Berater -->
                 <div class="col-lg-7">
-                    <div class="preview-panel">
-                        <model-viewer id="sofa-3d" src="assets/models/sofa_ecksofa.glb" camera-controls auto-rotate shadow-intensity="1" style="width: 100%; height: 500px;"></model-viewer>
+                    <div class="preview-room-container">
+                        <!-- 3D Viewer (80%) -->
+                        <div class="preview-panel" style="position: relative;">
+                            <model-viewer id="sofa-3d" src="assets/models/sofa_loveseat.glb" camera-controls auto-rotate shadow-intensity="1" style="width: 100%; height: 100%;"></model-viewer>
+                            <div id="dimensions-overlay" class="dimensions-overlay">
+                                <div class="dimension-item">↕ <span id="dim-length">Länge: 170 cm</span></div>
+                                <div class="dimension-item">↔ <span id="dim-width">Breite: 95 cm</span></div>
+                                <div class="dimension-item">⬆ <span id="dim-height">Höhe: 90 cm</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Raum-Berater (20%) -->
+                        <div class="info-box" id="room-advisor">
+                            <h4>Raum-Berater</h4>
+                            <label for="room-volume">Verfügbarer Raum (m³)</label>
+                            <select id="room-volume" class="form-select" onchange="onVolumeChange(this.value)">
+                                <option value="">-- auswählen --</option>
+                                <option value="0-2">Sehr klein (0-2 m³)</option>
+                                <option value="2-5">Klein (2-5 m³)</option>
+                                <option value="5-10">Mittel (5-10 m³)</option>
+                                <option value=">10">Groß (über 10 m³)</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <!-- Preiskatalog (rot) -->
+                    <!-- Preiskatalog -->
                     <div class="info-box" id="price-catalog">
                         <h4>Preiskatalog & Aufpreise</h4>
                         <div class="price-list" id="price-list-sizes">
@@ -430,31 +511,18 @@ $colors = [
                         </div>
                         <div class="price-list" id="price-list-materials" style="margin-top: 1rem;">
                             <?php foreach ($materials as $key => $label): ?>
-                                <div class="price-item" data-material="<?php echo $key; ?>" onclick="selectMaterial('<?php echo $key; ?>')">
+                                <div class="price-item" data-material="<?php echo $key; ?>" onclick="selectMaterial(null, '<?php echo $key; ?>')">
                                     <span><?php echo $label; ?></span>
                                     <span>+<?php echo $materialPrices[$key]; ?>€</span>
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                        <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #555;">Alle Farben sind im Grundpreis enthalten (0€ Aufpreis).</p>
-                    </div>
-
-                    <!-- Raum-Berater (grün) -->
-                    <div class="info-box" id="room-advisor">
-                        <h4>Raum-Berater</h4>
-                        <label for="room-volume" style="font-weight: 600;">Verfügbarer Raum (m³)</label>
-                        <select id="room-volume" class="form-select" style="max-width: 260px;" onchange="onVolumeChange(this.value)">
-                            <option value="">-- auswählen --</option>
-                            <option value="0-2">Sehr klein (0-2 m³)</option>
-                            <option value="2-5">Klein (2-5 m³)</option>
-                            <option value="5-10">Mittel (5-10 m³)</option>
-                            <option value=">10">Groß (über 10 m³)</option>
-                        </select>
+                        <p style="margin-top: 0.75rem; font-size: 0.9rem; color: #555;">Alle Farben sind kostenlos.</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Zusammenfassung und Preis -->
+            <!-- Zusammenfassung -->
             <div class="summary-card">
                 <div class="row align-items-center">
                     <div class="col-md-8">
@@ -478,320 +546,234 @@ $colors = [
                 </div>
                 <div class="text-center mt-4">
                     <button type="submit" id="submit-btn" class="btn btn-success btn-lg px-5 py-3" disabled>
-                        <i class="fas fa-shopping-cart me-2"></i>Konfiguration speichern
+                        💾 Speichern
                     </button>
                 </div>
             </div>
         </form>
-        
-        <!-- Versteckte Inputs für Preis -->
-        <input type="hidden" id="total-price" value="0">
     </div>
 
-    <!-- Bootstrap 5 JS via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
-        // Farbpalette aus PHP
+        // ===== Datenspeicher (zentral definiert) =====
         const colors = <?php echo json_encode($colors); ?>;
-    </script>
-
-    <script>
-        // JavaScript für interaktive Auswahl und Live-Zusammenfassung
-
-        // Initialisiere Zusammenfassung und Fortschritt beim Laden
-        document.addEventListener('DOMContentLoaded', function() {
-            updateSummary();
-            updateProgress();
-            updatePrice();
-
-            // Initialisiere Sofa basierend auf gespeicherten Werten
-            const selectedSize = document.querySelector('input[name="sofa_size"]:checked');
-            if (selectedSize) {
-                updateSofa3D(selectedSize.value);
+        
+        const CONFIG = {
+            BASE_PRICE: 500,
+            MODEL_PATH: 'assets/models/sofa_',
+            ROOM_SIZES: {
+                '0-2': 'hocker',
+                '2-5': 'sessel',
+                '5-10': '2-sitzer',
+                '>10': 'ecksofa'
             }
+        };
 
-            const selectedColor = document.querySelector('input[name="sofa_color"]:checked');
-            if (selectedColor) {
-                const colorOption = document.querySelector(`.color-option[data-color="${selectedColor.value}"]`);
-                if (colorOption) {
-                    const hex = colorOption.getAttribute('data-hex');
-                    updateSofaColor(hex);
+        const PRICES = {
+            sizes: {
+                '2-sitzer': 0, '3-sitzer': 200, 'ecksofa': 400, 'u-sofa': 600,
+                'sessel': 50, 'loveseat': 75, 'relaxsessel': 120, 'relaxsessel-hocker': 150,
+                'hocker': 20, 'hocker-gross': 35, 'schlafsofa': 220, 'recamiere': 180,
+                'modulsofa': 250, 'lounge-sofa': 160, 'daybed': 190, 'sofa-beistelltisch': 130,
+                'sofa-ottomane': 140, 'futon-sofa': 210, 'klappsofa': 170, 'bank-sofa': 110
+            },
+            materials: {
+                'stoff': 0, 'leder': 300, 'kunstleder': 150, 'samt': 200, 'mikrofaser': 100
+            }
+        };
+
+        const DIMENSIONS = {
+            '2-sitzer': { length: '190 cm', width: '95 cm', height: '90 cm' },
+            '3-sitzer': { length: '230 cm', width: '95 cm', height: '90 cm' },
+            'ecksofa': { length: '280 cm', width: '180 cm', height: '85 cm' },
+            'u-sofa': { length: '350 cm', width: '200 cm', height: '85 cm' },
+            'sessel': { length: '90 cm', width: '90 cm', height: '95 cm' },
+            'loveseat': { length: '170 cm', width: '95 cm', height: '90 cm' },
+            'relaxsessel': { length: '110 cm', width: '105 cm', height: '105 cm' },
+            'relaxsessel-hocker': { length: '80 cm', width: '70 cm', height: '45 cm' },
+            'hocker': { length: '60 cm', width: '60 cm', height: '45 cm' },
+            'hocker-gross': { length: '80 cm', width: '80 cm', height: '45 cm' },
+            'schlafsofa': { length: '210 cm', width: '140 cm', height: '90 cm' },
+            'recamiere': { length: '190 cm', width: '80 cm', height: '85 cm' },
+            'modulsofa': { length: '280 cm', width: '180 cm', height: '85 cm' },
+            'lounge-sofa': { length: '240 cm', width: '100 cm', height: '85 cm' },
+            'daybed': { length: '200 cm', width: '90 cm', height: '70 cm' },
+            'sofa-beistelltisch': { length: '260 cm', width: '120 cm', height: '85 cm' },
+            'sofa-ottomane': { length: '270 cm', width: '140 cm', height: '85 cm' },
+            'futon-sofa': { length: '200 cm', width: '100 cm', height: '80 cm' },
+            'klappsofa': { length: '220 cm', width: '120 cm', height: '85 cm' },
+            'bank-sofa': { length: '180 cm', width: '85 cm', height: '80 cm' }
+        };
+
+        const MATERIAL_ROUGHNESS = {
+            'stoff': 0.8, 'leder': 0.4, 'kunstleder': 0.6, 'samt': 1.0, 'mikrofaser': 0.7
+        };
+
+        // ===== Hilfsfunktionen =====
+        function getCheckedInput(name) {
+            return document.querySelector(`input[name="${name}"]:checked`);
+        }
+
+        function hexToRgb(hex) {
+            return [
+                parseInt(hex.slice(1, 3), 16) / 255,
+                parseInt(hex.slice(3, 5), 16) / 255,
+                parseInt(hex.slice(5, 7), 16) / 255
+            ];
+        }
+
+        // ===== UI-Updates =====
+        function updateSofa3D(size) {
+            const viewer = document.getElementById('sofa-3d');
+            viewer.src = CONFIG.MODEL_PATH + size + '.glb';
+            
+            const dims = DIMENSIONS[size] || { length: 'n/a', width: 'n/a', height: 'n/a' };
+            document.getElementById('dim-length').textContent = 'Länge: ' + dims.length;
+            document.getElementById('dim-width').textContent = 'Breite: ' + dims.width;
+            document.getElementById('dim-height').textContent = 'Höhe: ' + dims.height;
+        }
+
+        function updateSofaColor(hex) {
+            const viewer = document.getElementById('sofa-3d');
+            const [r, g, b] = hexToRgb(hex);
+            
+            const applyColor = () => {
+                if (viewer.model?.materials?.[0]) {
+                    viewer.model.materials[0].pbrMetallicRoughness.setBaseColorFactor([r, g, b, 1]);
                 }
+            };
+            
+            if (viewer.model?.materials?.[0]) {
+                applyColor();
+            } else {
+                viewer.addEventListener('load', applyColor, { once: true });
             }
+        }
 
-            const selectedMaterial = document.querySelector('input[name="sofa_material"]:checked');
-            if (selectedMaterial) {
-                updateSofaMaterial(selectedMaterial.value);
+        function updateSofaMaterial(material) {
+            const viewer = document.getElementById('sofa-3d');
+            const roughness = MATERIAL_ROUGHNESS[material] || 0.8;
+            
+            const applyMaterial = () => {
+                if (viewer.model?.materials?.[0]) {
+                    viewer.model.materials[0].pbrMetallicRoughness.setRoughnessFactor(roughness);
+                }
+            };
+            
+            if (viewer.model?.materials?.[0]) {
+                applyMaterial();
+            } else {
+                viewer.addEventListener('load', applyMaterial, { once: true });
             }
-        });
+        }
 
+        function updatePriceCatalogHighlight() {
+            const sizeInput = getCheckedInput('sofa_size');
+            const materialInput = getCheckedInput('sofa_material');
+
+            document.querySelectorAll('.price-item').forEach(el => {
+                const isSizeMatch = el.getAttribute('data-size') && sizeInput?.value === el.getAttribute('data-size');
+                const isMaterialMatch = el.getAttribute('data-material') && materialInput?.value === el.getAttribute('data-material');
+                el.classList.toggle('active', isSizeMatch || isMaterialMatch);
+            });
+        }
+
+        function updatePrice() {
+            const sizeInput = getCheckedInput('sofa_size');
+            const materialInput = getCheckedInput('sofa_material');
+
+            const sizePrice = PRICES.sizes[sizeInput?.value] || 0;
+            const materialPrice = PRICES.materials[materialInput?.value] || 0;
+            const total = CONFIG.BASE_PRICE + sizePrice + materialPrice;
+
+            document.getElementById('price-display').textContent = '€ ' + total.toLocaleString();
+        }
+
+        function updateSummary() {
+            const sizeInput = getCheckedInput('sofa_size');
+            const colorInput = getCheckedInput('sofa_color');
+            const materialInput = getCheckedInput('sofa_material');
+
+            document.getElementById('summary-size').textContent = 
+                sizeInput?.parentElement.querySelector('.card-title')?.textContent || 'Nicht ausgewählt';
+            document.getElementById('summary-color').textContent = colorInput?.value || 'Nicht ausgewählt';
+            document.getElementById('summary-material').textContent = 
+                materialInput?.parentElement.querySelector('.material-preview')?.textContent.trim() || 'Nicht ausgewählt';
+
+            document.getElementById('submit-btn').disabled = !(sizeInput && colorInput && materialInput);
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const completed = [getCheckedInput('sofa_size'), getCheckedInput('sofa_color'), getCheckedInput('sofa_material')]
+                .filter(Boolean).length;
+            const percentage = Math.round((completed / 3) * 100);
+
+            document.getElementById('progress-bar').style.width = percentage + '%';
+            document.getElementById('progress-text').textContent = completed + ' von 3 Schritten abgeschlossen';
+        }
+
+        // ===== Event Handler =====
         function selectSize(event, size) {
             document.querySelectorAll('.size-option').forEach(el => el.classList.remove('active'));
-            if (event && event.currentTarget) {
-                event.currentTarget.classList.add('active');
-            }
+            if (event?.currentTarget) event.currentTarget.classList.add('active');
+            
             const input = document.querySelector(`input[name="sofa_size"][value="${size}"]`);
             if (input) input.checked = true;
+            
             updateSofa3D(size);
             updateSummary();
             updatePrice();
+            updatePriceCatalogHighlight();
         }
 
-        function onVolumeChange(range) {
-            if (!range) return;
-            let selectedSize = 'hocker';
-            if (range === '0-2') {
-                selectedSize = 'hocker';
-            } else if (range === '2-5') {
-                selectedSize = 'sessel';
-            } else if (range === '5-10') {
-                selectedSize = '2-sitzer';
-            } else if (range === '>10') {
-                selectedSize = 'ecksofa';
-            }
-            // Markiere die korrekte Auswahl im UI
-            const option = document.querySelector(`.size-option[onclick*="${selectedSize}"]`);
-            if (option) {
-                option.click();
-            } else {
-                selectSize(null, selectedSize);
-            }
-        }
-
-        function selectColor(index) {
+        function selectColor(event) {
+            const target = event.currentTarget;
             document.querySelectorAll('.color-option').forEach(el => el.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            const colorName = event.currentTarget.getAttribute('data-color');
-            const colorHex = event.currentTarget.getAttribute('data-hex');
+            target.classList.add('active');
+            
+            const colorName = target.getAttribute('data-color');
+            const colorHex = target.getAttribute('data-hex');
             document.querySelector(`input[name="sofa_color"][value="${colorName}"]`).checked = true;
 
             updateSofaColor(colorHex);
             updateSummary();
         }
 
-        function selectMaterial(material) {
+        function selectMaterial(event, material) {
             document.querySelectorAll('.material-option').forEach(el => el.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            document.querySelector(`input[name="sofa_material"][value="${material}"]`).checked = true;
+            if (event?.currentTarget) event.currentTarget.classList.add('active');
+            
+            const input = document.querySelector(`input[name="sofa_material"][value="${material}"]`);
+            if (input) input.checked = true;
+            
             updateSofaMaterial(material);
             updateSummary();
             updatePrice();
-        }
-
-        function updateSummary() {
-            // Größe aktualisieren
-            const sizeInput = document.querySelector('input[name="sofa_size"]:checked');
-            const sizeText = sizeInput ? sizeInput.parentElement.querySelector('.card-title').textContent : 'Nicht ausgewählt';
-            document.getElementById('summary-size').textContent = sizeText;
-
-            // Preiskatalog hervorheben
             updatePriceCatalogHighlight();
-
-            // Farbe aktualisieren
-            const colorInput = document.querySelector('input[name="sofa_color"]:checked');
-            const colorText = colorInput ? colorInput.value : 'Nicht ausgewählt';
-            document.getElementById('summary-color').textContent = colorText;
-
-            // Material aktualisieren
-            const materialInput = document.querySelector('input[name="sofa_material"]:checked');
-            const materialText = materialInput ? materialInput.parentElement.querySelector('.material-preview').textContent.trim() : 'Nicht ausgewählt';
-            document.getElementById('summary-material').textContent = materialText;
-
-            // Button aktivieren/deaktivieren
-            const submitBtn = document.getElementById('submit-btn');
-            if (sizeInput && colorInput && materialInput) {
-                submitBtn.disabled = false;
-            } else {
-                submitBtn.disabled = true;
-            }
-
-            // Fortschritt aktualisieren
-            updateProgress();
         }
 
-        function updateSofa3D(size) {
-            const modelPath = 'assets/models/sofa_' + size + '.glb';
-            const viewer = document.getElementById('sofa-3d');
-            console.log('Lade 3D-Modell:', modelPath);
-            viewer.src = modelPath;
-            viewer.setAttribute('data-current-model', modelPath);
-        }
-
-        function updateSofaColor(hex) {
-            const modelViewer = document.getElementById('sofa-3d');
-            // Hex zu RGB konvertieren
-            const r = parseInt(hex.slice(1, 3), 16) / 255;
-            const g = parseInt(hex.slice(3, 5), 16) / 255;
-            const b = parseInt(hex.slice(5, 7), 16) / 255;
-            // Material setzen, wenn Modell geladen
-            const applyColor = () => {
-                if (modelViewer.model && modelViewer.model.materials && modelViewer.model.materials.length > 0) {
-                    modelViewer.model.materials[0].pbrMetallicRoughness.setBaseColorFactor([r, g, b, 1]);
-                }
-            };
-            if (modelViewer.model && modelViewer.model.materials && modelViewer.model.materials.length > 0) {
-                applyColor();
-            } else {
-                // Warte auf Modell-Load
-                modelViewer.addEventListener('load', applyColor);
-            }
-        }
-
-        function updateSofaMaterial(material) {
-            const modelViewer = document.getElementById('sofa-3d');
-            const roughnessMap = {
-                'stoff': 0.8,
-                'leder': 0.4,
-                'kunstleder': 0.6,
-                'samt': 1.0,
-                'mikrofaser': 0.7
-            };
-            const roughness = roughnessMap[material] || 0.8;
-
-            if (modelViewer.model && modelViewer.model.materials && modelViewer.model.materials.length > 0) {
-                modelViewer.model.materials[0].pbrMetallicRoughness.setRoughnessFactor(roughness);
-            } else {
-                modelViewer.addEventListener('load', () => {
-                    if (modelViewer.model.materials && modelViewer.model.materials.length > 0) {
-                        modelViewer.model.materials[0].pbrMetallicRoughness.setRoughnessFactor(roughness);
-                    }
-                });
-            }
-        }
-
-        function updatePriceCatalogHighlight() {
-            const selectedSize = document.querySelector('input[name="sofa_size"]:checked');
-            const selectedMaterial = document.querySelector('input[name="sofa_material"]:checked');
-
-            document.querySelectorAll('#price-list-sizes .price-item').forEach(el => {
-                const size = el.getAttribute('data-size');
-                if (selectedSize && selectedSize.value === size) {
-                    el.classList.add('active');
-                } else {
-                    el.classList.remove('active');
-                }
-            });
-
-            document.querySelectorAll('#price-list-materials .price-item').forEach(el => {
-                const material = el.getAttribute('data-material');
-                if (selectedMaterial && selectedMaterial.value === material) {
-                    el.classList.add('active');
-                } else {
-                    el.classList.remove('active');
-                }
-            });
-        }
-
-        function updatePrice() {
-            const sizeInput = document.querySelector('input[name="sofa_size"]:checked');
-            const materialInput = document.querySelector('input[name="sofa_material"]:checked');
-
-            let basePrice = 500;
-            let sizePrice = 0;
-            let materialPrice = 0;
-
-            if (sizeInput) {
-                const sizePrices = {
-                    '2-sitzer': 0,
-                    '3-sitzer': 200,
-                    'ecksofa': 400,
-                    'u-sofa': 600,
-                    'sessel': 50,
-                    'loveseat': 100,
-                    'relaxsessel': 150,
-                    'relaxsessel-hocker': 200,
-                    'hocker': 30,
-                    'hocker-gross': 60,
-                    'schlafsofa': 300,
-                    'recamiere': 250,
-                    'modulsofa': 400,
-                    'lounge-sofa': 350,
-                    'daybed': 200,
-                    'sofa-beistelltisch': 180,
-                    'sofa-ottomane': 220,
-                    'futon-sofa': 120,
-                    'klappsofa': 150,
-                    'bank-sofa': 100
-                };
-                sizePrice = sizePrices[sizeInput.value] || 0;
-            }
-
-            if (materialInput) {
-                const materialPrices = {
-                    'stoff': 0,
-                    'leder': 150,
-                    'kunstleder': 100,
-                    'samt': 80,
-                    'mikrofaser': 50
-                };
-                materialPrice = materialPrices[materialInput.value] || 0;
-            }
-
-            const totalPrice = basePrice + sizePrice + materialPrice;
-            document.getElementById('price-display').textContent = '€ ' + totalPrice.toLocaleString();
+        function onVolumeChange(range) {
+            if (!range) return;
+            const size = CONFIG.ROOM_SIZES[range];
+            if (size) selectSize(null, size);
         }
 
         function saveConfiguration(event) {
             event.preventDefault();
 
-            const sizeInput = document.querySelector('input[name="sofa_size"]:checked');
-            const colorInput = document.querySelector('input[name="sofa_color"]:checked');
-            const materialInput = document.querySelector('input[name="sofa_material"]:checked');
+            const sizeInput = getCheckedInput('sofa_size');
+            const colorInput = getCheckedInput('sofa_color');
+            const materialInput = getCheckedInput('sofa_material');
 
-            // Validierung
             if (!sizeInput || !colorInput || !materialInput) {
                 alert('Bitte wählen Sie Größe, Farbe und Material!');
                 return;
             }
 
-            // Preis berechnen
-            let basePrice = 500;
-            let sizePrice = 0;
-            let materialPrice = 0;
-
-            const sizePrices = {
-                '2-sitzer': 0,
-                '3-sitzer': 200,
-                'ecksofa': 400,
-                'u-sofa': 600,
-                'sessel': 50,
-                'loveseat': 100,
-                'relaxsessel': 150,
-                'relaxsessel-hocker': 200,
-                'hocker': 30,
-                'hocker-gross': 60,
-                'schlafsofa': 300,
-                'recamiere': 250,
-                'modulsofa': 400,
-                'lounge-sofa': 350,
-                'daybed': 200,
-                'sofa-beistelltisch': 180,
-                'sofa-ottomane': 220,
-                'futon-sofa': 120,
-                'klappsofa': 150,
-                'bank-sofa': 100
-            };
-
-            const materialPrices = {
-                'stoff': 0,
-                'leder': 150,
-                'kunstleder': 100,
-                'samt': 80,
-                'mikrofaser': 50
-            };
-
-            sizePrice = sizePrices[sizeInput.value] || 0;
-            materialPrice = materialPrices[materialInput.value] || 0;
-            const totalPrice = basePrice + sizePrice + materialPrice;
-
-            // Daten per fetch() senden
-            const data = {
-                size: sizeInput.value,
-                color: colorInput.value,
-                material: materialInput.value,
-                total_price: totalPrice
-            };
+            const sizePrice = PRICES.sizes[sizeInput.value] || 0;
+            const materialPrice = PRICES.materials[materialInput.value] || 0;
+            const totalPrice = CONFIG.BASE_PRICE + sizePrice + materialPrice;
 
             fetch('save.php', {
                 method: 'POST',
@@ -799,42 +781,45 @@ $colors = [
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify({
+                    size: sizeInput.value,
+                    color: colorInput.value,
+                    material: materialInput.value,
+                    total_price: totalPrice
+                })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Weiteleitung zur Zusammenfassungsseite
                     window.location.href = 'save.php?id=' + data.config_id;
                 } else {
-                    alert('Fehler beim Speichern: ' + (data.message || 'Unbekannter Fehler'));
+                    alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
                 }
             })
-            .catch(error => {
-                console.error('Fehler:', error);
-                alert('Fehler beim Speichern der Konfiguration!');
-            });
+            .catch(() => alert('Fehler beim Speichern!'));
         }
 
-        function updateProgress() {
-            const sizeSelected = document.querySelector('input[name="sofa_size"]:checked') !== null;
-            const colorSelected = document.querySelector('input[name="sofa_color"]:checked') !== null;
-            const materialSelected = document.querySelector('input[name="sofa_material"]:checked') !== null;
+        // ===== Initialisierung =====
+        document.addEventListener('DOMContentLoaded', () => {
+            const sizeInput = getCheckedInput('sofa_size');
+            if (sizeInput) {
+                updateSofa3D(sizeInput.value);
+            } else {
+                selectSize(null, 'loveseat');
+            }
 
-            let completed = 0;
-            if (sizeSelected) completed++;
-            if (colorSelected) completed++;
-            if (materialSelected) completed++;
+            const colorInput = getCheckedInput('sofa_color');
+            if (colorInput) {
+                const hex = document.querySelector(`.color-option[data-color="${colorInput.value}"]`)?.getAttribute('data-hex');
+                if (hex) updateSofaColor(hex);
+            }
 
-            const percentage = Math.round((completed / 3) * 100);
+            const materialInput = getCheckedInput('sofa_material');
+            if (materialInput) updateSofaMaterial(materialInput.value);
 
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
-
-            progressBar.style.width = percentage + '%';
-            progressBar.setAttribute('aria-valuenow', percentage);
-            progressText.textContent = completed + ' von 3 Schritten abgeschlossen';
-        }
+            updateSummary();
+            updatePrice();
+        });
     </script>
 </body>
 </html>
