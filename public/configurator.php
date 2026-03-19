@@ -350,7 +350,7 @@ $colors = [
         </div>
         <p class="text-center text-muted mb-4" id="progress-text" style="font-weight: 500;">0 von 3 Schritten abgeschlossen</p>
 
-        <form method="POST" action="save.php">
+        <form id="configurator-form" onsubmit="saveConfiguration(event)">
             <div class="row g-4">
                 <!-- Linke Spalte: Auswahloptionen -->
                 <div class="col-lg-5">
@@ -483,6 +483,9 @@ $colors = [
                 </div>
             </div>
         </form>
+        
+        <!-- Versteckte Inputs für Preis -->
+        <input type="hidden" id="total-price" value="0">
     </div>
 
     <!-- Bootstrap 5 JS via CDN -->
@@ -727,6 +730,90 @@ $colors = [
 
             const totalPrice = basePrice + sizePrice + materialPrice;
             document.getElementById('price-display').textContent = '€ ' + totalPrice.toLocaleString();
+        }
+
+        function saveConfiguration(event) {
+            event.preventDefault();
+
+            const sizeInput = document.querySelector('input[name="sofa_size"]:checked');
+            const colorInput = document.querySelector('input[name="sofa_color"]:checked');
+            const materialInput = document.querySelector('input[name="sofa_material"]:checked');
+
+            // Validierung
+            if (!sizeInput || !colorInput || !materialInput) {
+                alert('Bitte wählen Sie Größe, Farbe und Material!');
+                return;
+            }
+
+            // Preis berechnen
+            let basePrice = 500;
+            let sizePrice = 0;
+            let materialPrice = 0;
+
+            const sizePrices = {
+                '2-sitzer': 0,
+                '3-sitzer': 200,
+                'ecksofa': 400,
+                'u-sofa': 600,
+                'sessel': 50,
+                'loveseat': 100,
+                'relaxsessel': 150,
+                'relaxsessel-hocker': 200,
+                'hocker': 30,
+                'hocker-gross': 60,
+                'schlafsofa': 300,
+                'recamiere': 250,
+                'modulsofa': 400,
+                'lounge-sofa': 350,
+                'daybed': 200,
+                'sofa-beistelltisch': 180,
+                'sofa-ottomane': 220,
+                'futon-sofa': 120,
+                'klappsofa': 150,
+                'bank-sofa': 100
+            };
+
+            const materialPrices = {
+                'stoff': 0,
+                'leder': 150,
+                'kunstleder': 100,
+                'samt': 80,
+                'mikrofaser': 50
+            };
+
+            sizePrice = sizePrices[sizeInput.value] || 0;
+            materialPrice = materialPrices[materialInput.value] || 0;
+            const totalPrice = basePrice + sizePrice + materialPrice;
+
+            // Daten per fetch() senden
+            const data = {
+                size: sizeInput.value,
+                color: colorInput.value,
+                material: materialInput.value,
+                total_price: totalPrice
+            };
+
+            fetch('save.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Weiteleitung zur Zusammenfassungsseite
+                    window.location.href = 'save.php?id=' + data.config_id;
+                } else {
+                    alert('Fehler beim Speichern: ' + (data.message || 'Unbekannter Fehler'));
+                }
+            })
+            .catch(error => {
+                console.error('Fehler:', error);
+                alert('Fehler beim Speichern der Konfiguration!');
+            });
         }
 
         function updateProgress() {
