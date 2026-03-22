@@ -476,7 +476,7 @@ $colors = [
                     <div class="preview-room-container">
                         <!-- 3D Viewer (80%) -->
                         <div class="preview-panel" style="position: relative;">
-                            <model-viewer id="sofa-3d" src="assets/models/sofa_loveseat.glb" camera-controls auto-rotate shadow-intensity="1" style="width: 100%; height: 100%;"></model-viewer>
+                            <model-viewer id="sofa-3d" src="assets/models/sofa_loveseat.glb?v=<?= time() ?>" camera-controls auto-rotate shadow-intensity="1" style="width: 100%; height: 100%;"></model-viewer>
                             <div id="dimensions-overlay" class="dimensions-overlay">
                                 <div class="dimension-item">↕ <span id="dim-length">Länge: 170 cm</span></div>
                                 <div class="dimension-item">↔ <span id="dim-width">Breite: 95 cm</span></div>
@@ -625,7 +625,7 @@ $colors = [
         // ===== UI-Updates =====
         function updateSofa3D(size) {
             const viewer = document.getElementById('sofa-3d');
-            viewer.src = CONFIG.MODEL_PATH + size + '.glb';
+            viewer.src = CONFIG.MODEL_PATH + size + '.glb?v=' + Date.now();
             
             const dims = DIMENSIONS[size] || { length: 'n/a', width: 'n/a', height: 'n/a' };
             document.getElementById('dim-length').textContent = 'Länge: ' + dims.length;
