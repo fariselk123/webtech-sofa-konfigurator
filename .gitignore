@@ -1,0 +1,8 @@
+# Ignoriere große 3D-Modelldateien
+public/assets/models/*.glb
+
+# Andere typische Ignorierungen
+*.log
+.DS_Store
+node_modules/
+vendor/
